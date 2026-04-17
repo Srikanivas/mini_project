@@ -1,54 +1,57 @@
-CREATE TABLE s (
-    sid  INT PRIMARY KEY,
-    nm   VARCHAR(100),
-    em   VARCHAR(100),
-    jd   DATE
+CREATE DATABASE IF NOT EXISTS collage_lib;
+USE collage_lib;
+
+CREATE TABLE studs (
+    stud_id INT PRIMARY KEY,
+    full_name VARCHAR(100),
+    email_id VARCHAR(100),
+    join_dt DATE
 );
 
-CREATE TABLE b (
-    bid  INT PRIMARY KEY,
-    tt   VARCHAR(200),
-    cat  VARCHAR(50),
-    auth VARCHAR(100),
-    stk  INT DEFAULT 3
+CREATE TABLE boks (
+    bok_id INT PRIMARY KEY,
+    bok_title VARCHAR(200),
+    categry VARCHAR(50),
+    auther VARCHAR(100),
+    stok INT DEFAULT 3
 );
 
-CREATE TABLE ib (
-    iid  INT PRIMARY KEY,
-    sid  INT REFERENCES s(sid),
-    bid  INT REFERENCES b(bid),
-    isd  DATE,
-    rd   DATE
+CREATE TABLE isued_boks (
+    isue_id INT PRIMARY KEY,
+    stud_id INT,
+    bok_id INT,
+    isue_dt DATE,
+    retun_dt DATE,
+    FOREIGN KEY (stud_id) REFERENCES studs(stud_id),
+    FOREIGN KEY (bok_id) REFERENCES boks(bok_id)
 );
 
-CREATE TABLE pen (
-    pid   SERIAL PRIMARY KEY,
-    sid   INT REFERENCES s(sid),
-    iid   INT REFERENCES ib(iid),
-    amt   NUMERIC(6,2),
-    pd    DATE DEFAULT CURRENT_DATE
+CREATE TABLE penality (
+    pen_id INT AUTO_INCREMENT PRIMARY KEY,
+    stud_id INT,
+    isue_id INT,
+    fine_amt DECIMAL(6,2),
+    pen_dt DATE DEFAULT (CURRENT_DATE),
+    FOREIGN KEY (stud_id) REFERENCES studs(stud_id),
+    FOREIGN KEY (isue_id) REFERENCES isued_boks(isue_id)
 );
 
-CREATE TABLE log (
-    lid   SERIAL PRIMARY KEY,
-    act   VARCHAR(50),
-    sid   INT,
-    bid   INT,
-    ts    TIMESTAMP DEFAULT NOW()
+CREATE TABLE actvity_log (
+    log_id INT AUTO_INCREMENT PRIMARY KEY,
+    actn VARCHAR(50),
+    stud_id INT,
+    bok_id INT,
+    log_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX ix_ib_sid ON ib(sid);
-CREATE INDEX ix_ib_bid ON ib(bid);
-CREATE INDEX ix_ib_isd ON ib(isd);
-
-INSERT INTO s VALUES
+INSERT INTO studs VALUES
 (1,'Alice Ray','alice@mail.com','2020-01-10'),
 (2,'Bob Marsh','bob@mail.com','2019-05-22'),
 (3,'Carol Sun','carol@mail.com','2022-03-15'),
 (4,'Dan Fox','dan@mail.com','2021-07-01'),
 (5,'Eva Lin','eva@mail.com','2018-11-30');
 
-INSERT INTO b VALUES
+INSERT INTO boks VALUES
 (1,'The Great Gatsby','Fiction','F. Scott',3),
 (2,'A Brief History','Science','Hawking',2),
 (3,'Sapiens','History','Harari',4),
@@ -56,7 +59,7 @@ INSERT INTO b VALUES
 (5,'Cosmos','Science','Sagan',2),
 (6,'1984','Fiction','Orwell',5);
 
-INSERT INTO ib VALUES
+INSERT INTO isued_boks VALUES
 (1,1,1,'2026-03-25',NULL),
 (2,2,3,'2026-03-20',NULL),
 (3,3,4,'2026-04-10','2026-04-12'),
@@ -64,208 +67,200 @@ INSERT INTO ib VALUES
 (5,1,6,'2026-04-13',NULL),
 (6,5,5,'2022-01-01','2022-01-10');
 
-CREATE OR REPLACE FUNCTION fn_fine(p_iid INT) RETURNS NUMERIC AS $$
-DECLARE
-    d INT;
-BEGIN
-    SELECT COALESCE(rd, CURRENT_DATE) - isd INTO d FROM ib WHERE iid = p_iid;
-    RETURN GREATEST(0, (d - 14) * 0.50);
-END;
-$$ LANGUAGE plpgsql;
+DELIMITER $$
 
-CREATE OR REPLACE FUNCTION fn_dec_stk() RETURNS TRIGGER AS $$
-BEGIN
-    UPDATE b SET stk = stk - 1 WHERE bid = NEW.bid;
-    INSERT INTO log(act, sid, bid) VALUES ('ISSUE', NEW.sid, NEW.bid);
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_issue
-AFTER INSERT ON ib
-FOR EACH ROW EXECUTE FUNCTION fn_dec_stk();
-
-CREATE OR REPLACE FUNCTION fn_inc_stk() RETURNS TRIGGER AS $$
-BEGIN
-    IF NEW.rd IS NOT NULL AND OLD.rd IS NULL THEN
-        UPDATE b SET stk = stk + 1 WHERE bid = NEW.bid;
-        INSERT INTO log(act, sid, bid) VALUES ('RETURN', NEW.sid, NEW.bid);
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION fn_auto_pen() RETURNS TRIGGER AS $$
-DECLARE
-    d INT;
-BEGIN
-    d := NEW.rd - NEW.isd;
-    IF d > 14 THEN
-        INSERT INTO pen(sid, iid, amt)
-        VALUES (NEW.sid, NEW.iid, (d - 14) * 0.50);
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_pen
-AFTER UPDATE ON ib
+CREATE TRIGGER aftr_isue
+AFTER INSERT ON isued_boks
 FOR EACH ROW
-WHEN (NEW.rd IS NOT NULL AND OLD.rd IS NULL)
-EXECUTE FUNCTION fn_auto_pen();
-
-CREATE TRIGGER trg_return
-AFTER UPDATE ON ib
-FOR EACH ROW EXECUTE FUNCTION fn_inc_stk();
-
-CREATE VIEW v_pop AS
-SELECT b.cat, COUNT(*) AS borrows
-FROM ib
-JOIN b ON ib.bid = b.bid
-GROUP BY b.cat
-ORDER BY borrows DESC;
-
-CREATE OR REPLACE PROCEDURE pr_return(p_iid INT, p_rd DATE) AS $$
 BEGIN
-    UPDATE ib SET rd = p_rd WHERE iid = p_iid;
-END;
-$$ LANGUAGE plpgsql;
+    UPDATE boks SET stok = stok - 1 WHERE bok_id = NEW.bok_id;
+    INSERT INTO actvity_log(actn, stud_id, bok_id) VALUES ('ISSUED', NEW.stud_id, NEW.bok_id);
+END$$
 
-CREATE VIEW v_overdue AS
-SELECT s.sid, s.nm, b.tt, ib.isd,
-       CURRENT_DATE - ib.isd AS days_out,
-       (CURRENT_DATE - ib.isd - 14) * 0.50 AS fine
-FROM ib
-JOIN s ON ib.sid = s.sid
-JOIN b ON ib.bid = b.bid
-WHERE ib.rd IS NULL
-  AND CURRENT_DATE - ib.isd > 14;
+CREATE TRIGGER aftr_retun
+AFTER UPDATE ON isued_boks
+FOR EACH ROW
+BEGIN
+    IF NEW.retun_dt IS NOT NULL AND OLD.retun_dt IS NULL THEN
+        UPDATE boks SET stok = stok + 1 WHERE bok_id = NEW.bok_id;
+        INSERT INTO actvity_log(actn, stud_id, bok_id) VALUES ('RETURNED', NEW.stud_id, NEW.bok_id);
+        IF DATEDIFF(NEW.retun_dt, NEW.isue_dt) > 14 THEN
+            INSERT INTO penality(stud_id, isue_id, fine_amt)
+            VALUES (NEW.stud_id, NEW.isue_id, (DATEDIFF(NEW.retun_dt, NEW.isue_dt) - 14) * 0.50);
+        END IF;
+    END IF;
+END$$
 
-SELECT s.nm, b.tt, ib.isd, CURRENT_DATE - ib.isd AS days_out
-FROM ib
-INNER JOIN s ON ib.sid = s.sid
-INNER JOIN b ON ib.bid = b.bid
-WHERE ib.rd IS NULL AND CURRENT_DATE - ib.isd > 14;
+CREATE PROCEDURE mark_retun(IN p_id INT, IN p_dt DATE)
+BEGIN
+    UPDATE isued_boks SET retun_dt = p_dt WHERE isue_id = p_id;
+END$$
 
-SELECT s.nm, COUNT(ib.iid) AS cnt,
-       RANK() OVER (ORDER BY COUNT(ib.iid) DESC) AS rnk
-FROM ib
-JOIN s ON ib.sid = s.sid
-GROUP BY s.nm;
+CREATE FUNCTION get_fine(p_id INT) RETURNS DECIMAL(6,2)
+DETERMINISTIC
+BEGIN
+    DECLARE dayz INT;
+    SELECT DATEDIFF(COALESCE(retun_dt, CURDATE()), isue_dt) INTO dayz
+    FROM isued_boks WHERE isue_id = p_id;
+    RETURN GREATEST(0, (dayz - 14) * 0.50);
+END$$
 
-SELECT b.cat, COUNT(*) AS n
-FROM ib JOIN b ON ib.bid = b.bid
-GROUP BY b.cat
-HAVING COUNT(*) > 1;
+DELIMITER ;
 
-SELECT s.nm, b.tt
-FROM s
-FULL OUTER JOIN ib ON s.sid = ib.sid
-FULL OUTER JOIN b  ON ib.bid = b.bid;
+CREATE VIEW overdue_list AS
+SELECT studs.stud_id, studs.full_name, boks.bok_title, isued_boks.isue_dt,
+       DATEDIFF(CURDATE(), isued_boks.isue_dt) AS days_out,
+       (DATEDIFF(CURDATE(), isued_boks.isue_dt) - 14) * 0.50 AS fine
+FROM isued_boks
+JOIN studs ON isued_boks.stud_id = studs.stud_id
+JOIN boks ON isued_boks.bok_id = boks.bok_id
+WHERE isued_boks.retun_dt IS NULL
+AND DATEDIFF(CURDATE(), isued_boks.isue_dt) > 14;
 
-SELECT nm FROM s
-WHERE EXISTS (
-    SELECT 1 FROM ib WHERE ib.sid = s.sid AND ib.rd IS NULL
-);
+CREATE VIEW popular_categry AS
+SELECT boks.categry, COUNT(*) AS total_borrows
+FROM isued_boks
+JOIN boks ON isued_boks.bok_id = boks.bok_id
+GROUP BY boks.categry
+ORDER BY total_borrows DESC;
 
-SELECT b.cat, b.tt, ib.isd,
-       COUNT(*) OVER (PARTITION BY b.cat ORDER BY ib.isd) AS running
-FROM ib
-JOIN b ON ib.bid = b.bid;
+SELECT studs.full_name, boks.bok_title, isued_boks.isue_dt,
+       DATEDIFF(CURDATE(), isued_boks.isue_dt) AS days_out
+FROM isued_boks
+INNER JOIN studs ON isued_boks.stud_id = studs.stud_id
+INNER JOIN boks ON isued_boks.bok_id = boks.bok_id
+WHERE isued_boks.retun_dt IS NULL
+AND DATEDIFF(CURDATE(), isued_boks.isue_dt) > 14;
 
-SELECT s.nm, b.tt, ib.isd
-FROM ib
-JOIN s ON ib.sid = s.sid
-JOIN b ON ib.bid = b.bid
-WHERE ib.isd = (
-    SELECT MAX(i2.isd) FROM ib i2 WHERE i2.sid = ib.sid
-);
-
-SELECT b.tt, b.cat, COUNT(ib.iid) AS times
-FROM ib
-RIGHT JOIN b ON ib.bid = b.bid
-GROUP BY b.bid, b.tt, b.cat;
-
-SELECT nm FROM s
-WHERE sid IN (
-    SELECT sid FROM ib
-    GROUP BY sid
-    HAVING COUNT(*) > (SELECT AVG(c) FROM (SELECT COUNT(*) c FROM ib GROUP BY sid) t)
-);
-
-SELECT s.nm, COUNT(ib.iid) AS total
-FROM s
-LEFT JOIN ib ON s.sid = ib.sid
-GROUP BY s.nm
+SELECT studs.full_name, COUNT(isued_boks.isue_id) AS total
+FROM studs
+LEFT JOIN isued_boks ON studs.stud_id = isued_boks.stud_id
+GROUP BY studs.full_name
 ORDER BY total DESC;
 
-SELECT s.nm, b.tt,
-       CASE
-           WHEN ib.rd IS NOT NULL THEN 'Returned'
-           WHEN CURRENT_DATE - ib.isd > 14 THEN 'Overdue'
-           ELSE 'Active'
-       END AS status
-FROM ib
-JOIN s ON ib.sid = s.sid
-JOIN b ON ib.bid = b.bid;
+SELECT boks.bok_title, boks.categry, COUNT(isued_boks.isue_id) AS times_taken
+FROM isued_boks
+RIGHT JOIN boks ON isued_boks.bok_id = boks.bok_id
+GROUP BY boks.bok_id, boks.bok_title, boks.categry;
 
-SELECT sid FROM ib JOIN b ON ib.bid = b.bid WHERE b.cat = 'Fiction'
-INTERSECT
-SELECT sid FROM ib JOIN b ON ib.bid = b.bid WHERE b.cat = 'Science';
+SELECT a.full_name, b.full_name, YEAR(a.join_dt) AS yr
+FROM studs a
+JOIN studs b ON YEAR(a.join_dt) = YEAR(b.join_dt) AND a.stud_id < b.stud_id;
 
-WITH od AS (
-    SELECT ib.iid, s.nm, b.tt, CURRENT_DATE - ib.isd AS d
-    FROM ib
-    JOIN s ON ib.sid = s.sid
-    JOIN b ON ib.bid = b.bid
-    WHERE ib.rd IS NULL
-)
-SELECT nm, tt, d, (d - 14) * 0.50 AS fine
-FROM od WHERE d > 14;
-
-SELECT nm FROM s
-WHERE NOT EXISTS (
-    SELECT 1 FROM ib WHERE ib.sid = s.sid
+SELECT full_name FROM studs
+WHERE stud_id IN (
+    SELECT stud_id FROM isued_boks
+    GROUP BY stud_id
+    HAVING COUNT(*) > (SELECT AVG(cnt) FROM (SELECT COUNT(*) cnt FROM isued_boks GROUP BY stud_id) tmp)
 );
 
-SELECT a.nm AS x, b.nm AS y, EXTRACT(YEAR FROM a.jd) AS yr
-FROM s a
-JOIN s b ON EXTRACT(YEAR FROM a.jd) = EXTRACT(YEAR FROM b.jd)
-         AND a.sid < b.sid;
+SELECT studs.full_name, boks.bok_title, isued_boks.isue_dt
+FROM isued_boks
+JOIN studs ON isued_boks.stud_id = studs.stud_id
+JOIN boks ON isued_boks.bok_id = boks.bok_id
+WHERE isued_boks.isue_dt = (
+    SELECT MAX(x.isue_dt) FROM isued_boks x WHERE x.stud_id = isued_boks.stud_id
+);
 
-SELECT b.cat, COUNT(*) AS borrows,
-       ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) AS pct
-FROM ib
-JOIN b ON ib.bid = b.bid
-GROUP BY b.cat
+SELECT studs.full_name, boks.bok_title,
+       CASE
+           WHEN isued_boks.retun_dt IS NOT NULL THEN 'Returned'
+           WHEN DATEDIFF(CURDATE(), isued_boks.isue_dt) > 14 THEN 'Overdue'
+           ELSE 'Active'
+       END AS loan_status
+FROM isued_boks
+JOIN studs ON isued_boks.stud_id = studs.stud_id
+JOIN boks ON isued_boks.bok_id = boks.bok_id;
+
+SELECT studs.full_name, COUNT(isued_boks.isue_id) AS cnt,
+       RANK() OVER (ORDER BY COUNT(isued_boks.isue_id) DESC) AS rnk
+FROM isued_boks
+JOIN studs ON isued_boks.stud_id = studs.stud_id
+GROUP BY studs.full_name;
+
+SELECT boks.categry, boks.bok_title, isued_boks.isue_dt,
+       COUNT(*) OVER (PARTITION BY boks.categry ORDER BY isued_boks.isue_dt) AS running_cnt
+FROM isued_boks
+JOIN boks ON isued_boks.bok_id = boks.bok_id;
+
+WITH overdue AS (
+    SELECT isued_boks.isue_id, studs.full_name, boks.bok_title,
+           DATEDIFF(CURDATE(), isued_boks.isue_dt) AS dayz
+    FROM isued_boks
+    JOIN studs ON isued_boks.stud_id = studs.stud_id
+    JOIN boks ON isued_boks.bok_id = boks.bok_id
+    WHERE isued_boks.retun_dt IS NULL
+)
+SELECT full_name, bok_title, dayz, (dayz - 14) * 0.50 AS fine
+FROM overdue WHERE dayz > 14;
+
+SELECT full_name FROM studs
+WHERE NOT EXISTS (
+    SELECT 1 FROM isued_boks WHERE isued_boks.stud_id = studs.stud_id
+);
+
+SELECT full_name FROM studs
+WHERE EXISTS (
+    SELECT 1 FROM isued_boks WHERE isued_boks.stud_id = studs.stud_id AND retun_dt IS NULL
+);
+
+SELECT boks.categry, COUNT(*) AS borrows,
+       ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) AS prcnt
+FROM isued_boks
+JOIN boks ON isued_boks.bok_id = boks.bok_id
+GROUP BY boks.categry
 ORDER BY borrows DESC;
 
-SELECT sid FROM ib
-EXCEPT
-SELECT sid FROM ib WHERE rd IS NOT NULL;
+SELECT boks.categry, COUNT(*) AS n
+FROM isued_boks JOIN boks ON isued_boks.bok_id = boks.bok_id
+GROUP BY boks.categry
+HAVING COUNT(*) > 1;
 
-SELECT s.nm, 'Overdue' AS flag, ib.isd::TEXT AS dt
-FROM ib JOIN s ON ib.sid = s.sid
-WHERE ib.rd IS NULL AND CURRENT_DATE - ib.isd > 14
+SELECT studs.full_name, 'Overdue' AS flag, CAST(isued_boks.isue_dt AS CHAR) AS dt
+FROM isued_boks JOIN studs ON isued_boks.stud_id = studs.stud_id
+WHERE isued_boks.retun_dt IS NULL AND DATEDIFF(CURDATE(), isued_boks.isue_dt) > 14
 UNION
-SELECT s.nm, 'Penalty', pen.pd::TEXT
-FROM pen JOIN s ON pen.sid = s.sid;
+SELECT studs.full_name, 'Penalty', CAST(penality.pen_dt AS CHAR)
+FROM penality JOIN studs ON penality.stud_id = studs.stud_id;
 
-UPDATE ib SET isd = isd - 7
-WHERE sid = (SELECT sid FROM s WHERE nm = 'Bob Marsh');
-
-SELECT * FROM v_overdue;
-
-CALL pr_return(1, CURRENT_DATE);
-
-SELECT fn_fine(2) AS fine_amt;
-
-SELECT * FROM v_pop;
-
-SELECT * FROM log ORDER BY ts DESC;
-
-DELETE FROM s
-WHERE sid NOT IN (
-    SELECT DISTINCT sid FROM ib
-    WHERE isd >= CURRENT_DATE - INTERVAL '3 years'
+SELECT stud_id FROM isued_boks
+JOIN boks ON isued_boks.bok_id = boks.bok_id WHERE boks.categry = 'Fiction'
+AND stud_id IN (
+    SELECT stud_id FROM isued_boks
+    JOIN boks ON isued_boks.bok_id = boks.bok_id WHERE boks.categry = 'Science'
 );
+
+SELECT * FROM overdue_list;
+
+SELECT * FROM popular_categry;
+
+SELECT get_fine(2) AS fine_amt;
+
+CALL mark_retun(1, CURDATE());
+
+SELECT * FROM actvity_log ORDER BY log_time DESC;
+
+UPDATE isued_boks SET isue_dt = DATE_SUB(isue_dt, INTERVAL 7 DAY)
+WHERE stud_id = (SELECT stud_id FROM studs WHERE full_name = 'Bob Marsh');
+
+SET SQL_SAFE_UPDATES = 0;
+SET FOREIGN_KEY_CHECKS = 0;
+
+DELETE FROM isued_boks
+WHERE stud_id NOT IN (
+    SELECT stud_id FROM (
+        SELECT stud_id FROM isued_boks
+        WHERE isue_dt >= DATE_SUB(CURDATE(), INTERVAL 3 YEAR)
+    ) tmp
+);
+
+DELETE FROM studs
+WHERE stud_id NOT IN (
+    SELECT stud_id FROM (
+        SELECT stud_id FROM isued_boks
+        WHERE isue_dt >= DATE_SUB(CURDATE(), INTERVAL 3 YEAR)
+    ) tmp
+);
+
+SET FOREIGN_KEY_CHECKS = 1;
+SET SQL_SAFE_UPDATES = 1;
