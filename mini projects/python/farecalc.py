@@ -1,7 +1,7 @@
 import math
 from datetime import datetime
 
-r = {'Economy': 10, 'Premium': 18, 'SUV': 25}
+r = {'economy': 10, 'premium': 18, 'suv': 25}
 
 history = []
 
@@ -20,15 +20,22 @@ def receipt(t, km, h, base, m, total):
     print("=================================\n")
 
 def save_log(t, km, h, total):
-    f = open("rides.log", "a")
-    f.write(f"{datetime.now()} | {t} | {km}km | hr={h} | total={total:.2f}\n")
-    f.close()
+    try:
+        f = open("rides.log", "a")
+        f.write(f"{datetime.now()} | {t} | {km}km | hr={h} | total={total:.2f}\n")
+        f.close()
+    except Exception:
+        print("Could not save log.")
 
 def load_history():
-    f = open("rides.log", "r")
-    lines = f.readlines()
-    f.close()
-    return lines
+    try:
+        f = open("rides.log", "r")
+        lines = f.readlines()
+        f.close()
+        return lines
+    except FileNotFoundError:
+        print("No log file found.")
+        return []
 
 def show_rates():
     print("\nAvailable Rates:")
@@ -58,7 +65,7 @@ def show_history():
 
 def get_input():
     show_rates()
-    t = input("Vehicle type: ").strip().title()
+    t = input("Vehicle type: ").strip()
     try:
         km = float(input("Distance in km: "))
         h = int(input("Hour of day (0-23): "))
