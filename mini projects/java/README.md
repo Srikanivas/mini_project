@@ -41,20 +41,48 @@ java Main
 [q] Quit
 ```
 
+## Screenshots
+
+![Full Session – Deposit, Withdraw, Insufficient Funds, Statement](screenshots/session.png)
+
 ## Sample Session
 
 ```
-Account holder name: John
-Opening balance: 500
-Welcome, John! Balance: 500.00
+Account holder name: Srikar
+Opening balance: 120000
+Welcome, Srikar! Balance: 120000.00
+
+[1] Deposit  [2] Withdraw  [3] Statement  [q] Quit
+Choice: 1
+Amount to deposit: 1002
+Deposited 1002.00 | New Balance: 121002.00
 
 [1] Deposit  [2] Withdraw  [3] Statement  [q] Quit
 Choice: 2
-Amount to withdraw: 600
-Error: Insufficient funds. Shortfall: 100.0
+Amount to withdraw: 20000
+Withdrawn 20000.00 | New Balance: 101002.00
 
+[1] Deposit  [2] Withdraw  [3] Statement  [q] Quit
+Choice: 2
+Amount to withdraw: 100000
+Withdrawn 100000.00 | New Balance: 1002.00
+
+[1] Deposit  [2] Withdraw  [3] Statement  [q] Quit
+Choice: 2
+Amount to withdraw: 30000
+Error: Insufficient funds. Shortfall: 28998.0
+
+[1] Deposit  [2] Withdraw  [3] Statement  [q] Quit
 Choice: 3
---- Mini Statement [John] ---
-No transactions yet.
-Current Balance: 500.00
+
+--- Mini Statement [Srikar] ---
+  DEP  +1002.00 | Bal: 121002.00
+  WDR  -20000.00 | Bal: 101002.00
+  WDR  -100000.00 | Bal: 1002.00
+Current Balance: 1002.00
+--------------------------------
+
+[1] Deposit  [2] Withdraw  [3] Statement  [q] Quit
+Choice: q
+Goodbye!
 ```
