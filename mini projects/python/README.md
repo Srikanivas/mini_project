@@ -51,6 +51,20 @@ python farecalc.py
 [q] Quit
 ```
 
+## Screenshots
+
+### Fare Receipt with Surge Pricing
+
+SUV ride for 12 km during peak hours (19:00) — surge multiplier of 1.5x applied.
+
+![Fare Receipt with Surge](screenshots/fare_receipt_surge.png)
+
+### Receipt, Session History, Past Logs & Quit
+
+Premium ride for 15 km at off-peak hours, followed by viewing session history, past ride logs, and exiting.
+
+![Receipt, History and Logs](screenshots/fare_receipt_history_logs.png)
+
 ## Sample Receipt
 
 ```
