@@ -80,3 +80,59 @@ SELECT fn_fine(2);
 ```sql
 SELECT * FROM log ORDER BY ts DESC;
 ```
+
+## Screenshots
+
+### 1. Create Tables
+
+DDL — database and all five tables (`studs`, `books`, `issued_books`, `penality`, `actvity_log`) created.
+
+![Create Tables](screenshots/01_create_tables.png)
+
+### 2. Insert Data
+
+DML — sample rows inserted into `studs`, `books`, and `issued_books`.
+
+![Insert Data](screenshots/02_insert_data.png)
+
+### 3. Triggers, Stored Procedure & Function
+
+`after_issue` and `after_return` triggers, `mark_return` procedure, and `get_fine` function defined.
+
+![Triggers Procedure Function](screenshots/03_triggers_procedure_function.png)
+
+### 4. Views
+
+`overdue_list` and `popular_category` views created.
+
+![Views](screenshots/04_views.png)
+
+### 5. Joins
+
+INNER, LEFT, RIGHT, and SELF join queries executed against students and books.
+
+![Joins](screenshots/05_joins_queries.png)
+
+### 6. Subqueries & CTE
+
+Correlated subqueries, `EXISTS`/`NOT EXISTS`, and a CTE for overdue fine calculation.
+
+![Subqueries and CTE](screenshots/06_subqueries_cte.png)
+
+### 7. Overdue & Popular Category Views
+
+`SELECT * FROM overdue_list` and `SELECT * FROM popular_category` results.
+
+![Overdue and Popular Views](screenshots/07_overdue_popular_views.png)
+
+### 8. Procedure, Function & Audit Log
+
+`mark_return` called, `get_fine` result, and `actvity_log` output.
+
+![Procedure Function Log](screenshots/08_procedure_function_log.png)
+
+### 9. Update & Delete
+
+Conditional UPDATE on issue date and DELETE of inactive records with safe-update guards.
+
+![Update and Delete](screenshots/09_update_delete.png)
